@@ -1,3 +1,7 @@
+local SAVECUBE_COORDINATES = Vector3.new(-4185.1, 102.6, 283.6)
+local UNDERGROUND_COORDINATES = Vector3.new(-5048.8, -258.8, -129.8)
+local SAVEVIBECHECK_COORDINATES = Vector3.new(-4878.1, -165.5, -921.2)
+
 local function updateCameraSettings()
     if State.Camera.NoclipEnabled then
         LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
@@ -165,4 +169,40 @@ local function teleportToTarget()
     
     local backCFrame = CFrame.new(targetPosition) * CFrame.Angles(0, math.pi, 0)
     myRoot.CFrame = backCFrame
+end
+
+local function teleportToSaveCube()
+    if Library.Unloaded then return end
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local rootPart = getHumanoidRootPart(character)
+    if not rootPart then return end
+    
+    rootPart.CFrame = CFrame.new(SAVECUBE_COORDINATES)
+    Library:Notify("Teleported to Save Cube", 2)
+end
+
+local function teleportToUnderground()
+    if Library.Unloaded then return end
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local rootPart = getHumanoidRootPart(character)
+    if not rootPart then return end
+    
+    rootPart.CFrame = CFrame.new(UNDERGROUND_COORDINATES)
+    Library:Notify("Teleported to Underground", 2)
+end
+
+local function teleportToSaveVibecheck()
+    if Library.Unloaded then return end
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local rootPart = getHumanoidRootPart(character)
+    if not rootPart then return end
+    
+    rootPart.CFrame = CFrame.new(SAVEVIBECHECK_COORDINATES)
+    Library:Notify("Teleported to Save Vibecheck", 2)
 end
