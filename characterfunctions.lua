@@ -1,3 +1,17 @@
+[file name]: image.png
+[file content begin]
+19:12:21 ~~ CoreGui.7808.Loadstring.loadstring:874312:297: attempt to index nil with ‘Farm
+Stack Begin
+
+@ = Script 'CoreGui.7808.Loadstring. loadstring: 874312’
+
+Script 'CoreGui.7808.3371885', Line 52
+
+Stack End
+
+
+[file content end]
+
 -- ============================================
 -- AUTO FARM SYSTEM (ПОЛНЫЙ МОДУЛЬ)
 -- ============================================
@@ -291,6 +305,11 @@ local function CollectorDeactivate()
         CoolDowns.AutoPickUps.MoneyCooldown = false
     end
     Library:Notify("Auto Pick Money disabled!", 3)
+end
+
+-- Создание вкладки Farm если её нет
+if not Tabs.Farm then
+    Tabs.Farm = Library:AddTab("Farm")
 end
 
 -- UI для AutoFarm
