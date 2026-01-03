@@ -1,321 +1,168 @@
-local function noclipLoop()
-    while State.Noclip.Enabled do
-        if LocalPlayer.Character then
-            for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
-                end
-            end
-        end
-        RunService.RenderStepped:Wait()
-    end
-end
-
-local function toggleNoclip(state)
-    State.Noclip.Enabled = state
-    _G.NoclipPersistent = state
-    
-    if State.Noclip.Enabled then
-        Library:Notify("Noclip enabled", 2)
-        noclipLoop()
-        
-        local function onCharacterAdded(char)
-            task.wait(0.5)
-            if State.Noclip.Enabled then
-                noclipLoop()
-            end
-        end
-        
-        if LocalPlayer.Character then
-            onCharacterAdded(LocalPlayer.Character)
-        end
-        LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+local function updateCameraSettings()
+    if State.Camera.NoclipEnabled then
+        LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
     else
-        if State.Noclip.Connection then
-            State.Noclip.Connection:Disconnect()
-            State.Noclip.Connection = nil
+        LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Zoom
+    end
+end
+
+local function findTargetPlayer(playerName)
+    for _, player in pairs(Players:GetPlayers()) do
+        if string.lower(player.Name) == string.lower(playerName) or 
+           string.lower(player.DisplayName) == string.lower(playerName) then
+            return player
         end
-        Library:Notify("Noclip disabled", 2)
     end
+    return nil
 end
 
-local function stopNeckMovement()
-    if LocalPlayer.Character then
-        LocalPlayer.Character:SetAttribute("NoNeckMovement", true)
+local function getHumanoidRootPart(character)
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        return character.HumanoidRootPart
     end
+    return nil
 end
 
-local function restoreNeckMovement()
-    if LocalPlayer.Character then
-        LocalPlayer.Character:SetAttribute("NoNeckMovement", false)
-    end
-end
-
-local function toggleStopNeckMove(state)
-    State.StopNeckMove.Enabled = state
+local function toggleFists()
+    local character = LocalPlayer.Character
+    if not character then return end
     
-    if State.StopNeckMove.Enabled then
-        stopNeckMovement()
-        Library:Notify("Stop Neck Move enabled", 2)
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not backpack then return end
+    
+    for _, tool in pairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            tool.Parent = backpack
+            task.wait(0.2)
+            tool.Parent = character
+            break
+        end
+    end
+end
+
+local function enableNoClip(character)
+    if not character then return end
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+end
+
+local function startESpam()
+    if State.AutoFarm.ESpamConnection then
+        State.AutoFarm.ESpamConnection:Disconnect()
+    end
+    
+    State.AutoFarm.ESpamConnection = RunService.Heartbeat:Connect(function()
+        if Library.Unloaded then 
+            if State.AutoFarm.ESpamConnection then
+                State.AutoFarm.ESpamConnection:Disconnect()
+                State.AutoFarm.ESpamConnection = nil
+            end
+            return 
+        end
         
-        local connection = LocalPlayer.CharacterAdded:Connect(function(char)
-            task.wait(0.5)
-            if State.StopNeckMove.Enabled then
-                stopNeckMovement()
-            end
-        end)
+        if not State.AutoFarm.Enabled or State.AutoFarm.IsRespawning then return end
         
-        if State.StopNeckMove.Connection then
-            State.StopNeckMove.Connection:Disconnect()
-        end
-        State.StopNeckMove.Connection = connection
-    else
-        restoreNeckMovement()
-        if State.StopNeckMove.Connection then
-            State.StopNeckMove.Connection:Disconnect()
-            State.StopNeckMove.Connection = nil
-        end
-        Library:Notify("Stop Neck Move disabled", 2)
-    end
-end
-
-local function setupUnbreakLimbs()
-    local charStats = ReplicatedStorage.CharStats
-    if not charStats then return end
-    
-    local myStats = charStats:FindFirstChild(LocalPlayer.Name)
-    if not myStats then return end
-    
-    local limbsFolder = myStats:FindFirstChild("HealthValues")
-    if not limbsFolder then return end
-    
-    local function unbreakAllLimbs()
-        for _, limb in pairs(limbsFolder:GetChildren()) do
-            local brokenValue = limb:FindFirstChild("Broken")
-            if brokenValue then
-                brokenValue.Value = false
-                local connection = brokenValue:GetPropertyChangedSignal("Value"):Connect(function()
-                    brokenValue.Value = false
-                end)
-                table.insert(State.UnbreakLimbs.Connections, connection)
-            end
-        end
-    end
-    
-    unbreakAllLimbs()
-    
-    local childAddedConnection = limbsFolder.ChildAdded:Connect(function()
-        task.wait(0.1)
-        if State.UnbreakLimbs.Enabled then
-            unbreakAllLimbs()
-        end
-    end)
-    table.insert(State.UnbreakLimbs.Connections, childAddedConnection)
-end
-
-local function toggleUnbreakLimbs(state)
-    State.UnbreakLimbs.Enabled = state
-    
-    if State.UnbreakLimbs.Enabled then
-        setupUnbreakLimbs()
-        Library:Notify("Unbreak Limbs enabled", 2)
-        
-        LocalPlayer.CharacterAdded:Connect(function()
-            task.wait(1)
-            if State.UnbreakLimbs.Enabled then
-                setupUnbreakLimbs()
-            end
-        end)
-    else
-        for _, connection in pairs(State.UnbreakLimbs.Connections) do
-            if connection then
-                connection:Disconnect()
-            end
-        end
-        State.UnbreakLimbs.Connections = {}
-        Library:Notify("Unbreak Limbs disabled", 2)
-    end
-end
-
-local function setupFakeDown()
-    if not LocalPlayer.Character then return end
-    
-    local charStats = ReplicatedStorage.CharStats
-    if not charStats then return end
-    
-    local myStats = charStats:FindFirstChild(LocalPlayer.Name)
-    if not myStats then return end
-    
-    local downedValue = myStats:FindFirstChild("Downed")
-    if not downedValue then return end
-    
-    State.FakeDowned.DownedStatObject = downedValue
-    State.FakeDowned.OriginalDownedValue = downedValue.Value
-    
-    if downedValue.Value ~= true then
-        downedValue.Value = true
-    end
-    
-    State.FakeDowned.Connection = downedValue:GetPropertyChangedSignal("Value"):Connect(function()
-        if downedValue.Value ~= true then
-            downedValue.Value = true
+        local character = LocalPlayer.Character
+        if character then
+            local virtualInput = game:GetService("VirtualInputManager")
+            virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.05)
+            virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
         end
     end)
 end
 
-local function restoreOriginalDowned()
-    if State.FakeDowned.DownedStatObject and State.FakeDowned.OriginalDownedValue ~= nil then
-        if State.FakeDowned.Connection then
-            State.FakeDowned.Connection:Disconnect()
-            State.FakeDowned.Connection = nil
-        end
-        State.FakeDowned.DownedStatObject.Value = State.FakeDowned.OriginalDownedValue
-        State.FakeDowned.DownedStatObject = nil
-        State.FakeDowned.OriginalDownedValue = nil
-    end
-end
-
-local function toggleFakeDowned(state)
-    State.FakeDowned.Enabled = state
+local function forceRespawn()
+    if State.AutoFarm.RespawnCooldown or State.AutoFarm.IsRespawning then return end
     
-    if State.FakeDowned.Enabled then
-        setupFakeDown()
-        Library:Notify("Fake Downed enabled", 2)
-        
-        LocalPlayer.CharacterAdded:Connect(function()
-            task.wait(1)
-            if State.FakeDowned.Enabled then
-                setupFakeDown()
-            end
-        end)
-    else
-        restoreOriginalDowned()
-        Library:Notify("Fake Downed disabled", 2)
-    end
-end
-
-local function addForceField(character)
+    State.AutoFarm.RespawnCooldown = true
+    State.AutoFarm.IsRespawning = true
+    
+    local character = LocalPlayer.Character
     if character then
-        for _, obj in pairs(character:GetChildren()) do
-            if obj:IsA("ForceField") and obj.Visible == false then
-                obj:Destroy()
-            end
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.Health = 0
         end
-        
-        local ff = Instance.new("ForceField")
-        ff.Parent = character
-        ff.Visible = false
-        
-        local connection = character.ChildAdded:Connect(function(child)
-            if child:IsA("ForceField") and child.Visible == false then
-                task.wait(0.1)
-                if State.NoFallDamage.Enabled then
-                    child.Visible = false
-                end
-            end
-        end)
-        table.insert(State.NoFallDamage.Connections, connection)
     end
+    
+    local virtualInput = game:GetService("VirtualInputManager")
+    
+    virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.05)
+    virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    
+    task.wait(0.3)
+    virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.05)
+    virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    
+    task.wait(0.2)
+    virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.05)
+    virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    
+    task.wait(0.5)
+    State.AutoFarm.RespawnCooldown = false
+    State.AutoFarm.IsRespawning = false
 end
 
-local function toggleNoFallDamage(state)
-    State.NoFallDamage.Enabled = state
-    
-    if State.NoFallDamage.Enabled then
-        if LocalPlayer.Character then
-            addForceField(LocalPlayer.Character)
-        end
-        Library:Notify("No Fall Damage enabled", 2)
-        
-        local connection = LocalPlayer.CharacterAdded:Connect(function(char)
-            task.wait(0.5)
-            if State.NoFallDamage.Enabled then
-                addForceField(char)
-            end
-        end)
-        table.insert(State.NoFallDamage.Connections, connection)
-    else
-        for _, connection in pairs(State.NoFallDamage.Connections) do
-            if connection then
-                connection:Disconnect()
-            end
-        end
-        State.NoFallDamage.Connections = {}
-        
-        if LocalPlayer.Character then
-            for _, obj in pairs(LocalPlayer.Character:GetChildren()) do
-                if obj:IsA("ForceField") and obj.Visible == false then
-                    obj:Destroy()
-                end
-            end
-        end
-        Library:Notify("No Fall Damage disabled", 2)
-    end
-end
-
-local function disableBarriers()
-    local filterFolder = Workspace:FindFirstChild("Filter")
-    if not filterFolder then return end
-    
-    local partsFolder = filterFolder:FindFirstChild("Parts")
-    if not partsFolder then return end
-    
-    local fParts = partsFolder:FindFirstChild("F_Parts")
-    if not fParts then return end
-    
-    for _, descendant in pairs(fParts:GetDescendants()) do
-        if descendant:IsA("Part") or descendant:IsA("MeshPart") then
-            descendant.CanTouch = false
-        end
+local function startDamageDetection()
+    if State.AutoFarm.DamageCheckConnection then
+        State.AutoFarm.DamageCheckConnection:Disconnect()
     end
     
-    State.NoSpike.Connection = fParts.DescendantAdded:Connect(function(descendant)
-        if descendant:IsA("Part") or descendant:IsA("MeshPart") then
-            descendant.CanTouch = false
+    State.AutoFarm.DamageCheckConnection = RunService.Heartbeat:Connect(function()
+        if Library.Unloaded then 
+            if State.AutoFarm.DamageCheckConnection then
+                State.AutoFarm.DamageCheckConnection:Disconnect()
+                State.AutoFarm.DamageCheckConnection = nil
+            end
+            return 
+        end
+        
+        if not State.AutoFarm.Enabled or State.AutoFarm.IsRespawning then return end
+        
+        local character = LocalPlayer.Character
+        if not character then return end
+    
+        local humanoid = character:FindFirstChild("Humanoid")
+        if not humanoid then return end
+        
+        if humanoid.MaxHealth > State.AutoFarm.MaxHealth then
+            State.AutoFarm.MaxHealth = humanoid.MaxHealth
+        end
+        
+        if humanoid.Health < State.AutoFarm.MaxHealth then
+            forceRespawn()
         end
     end)
 end
 
-local function toggleNoSpike(state)
-    State.NoSpike.Enabled = state
+local function teleportToTarget()
+    if Library.Unloaded then return end
+    if not State.AutoFarm.Enabled or State.AutoFarm.IsRespawning then return end
     
-    if State.NoSpike.Enabled then
-        if Workspace:FindFirstChild("Filter") then
-            disableBarriers()
-        else
-            local workspaceConnection = Workspace.ChildAdded:Connect(function(child)
-                if child.Name == "Filter" then
-                    task.wait(0.5)
-                    if State.NoSpike.Enabled then
-                        disableBarriers()
-                    end
-                    workspaceConnection:Disconnect()
-                end
-            end)
-        end
-        
-        Library:Notify("No Spike enabled", 2)
-    else
-        if State.NoSpike.Connection then
-            State.NoSpike.Connection:Disconnect()
-            State.NoSpike.Connection = nil
-        end
-        
-        local filterFolder = Workspace:FindFirstChild("Filter")
-        if filterFolder then
-            local partsFolder = filterFolder:FindFirstChild("Parts")
-            if partsFolder then
-                local fParts = partsFolder:FindFirstChild("F_Parts")
-                if fParts then
-                    for _, descendant in pairs(fParts:GetDescendants()) do
-                        if descendant:IsA("Part") or descendant:IsA("MeshPart") then
-                            descendant.CanTouch = true
-                        end
-                    end
-                end
-            end
-        end
-        
-        Library:Notify("No Spike disabled", 2)
-    end
+    local myCharacter = LocalPlayer.Character
+    if not myCharacter or not State.AutoFarm.TargetPlayer then return end
+    
+    local targetCharacter = State.AutoFarm.TargetPlayer.Character
+    if not targetCharacter then return end
+    
+    local myRoot = getHumanoidRootPart(myCharacter)
+    if not myRoot then return end
+    
+    enableNoClip(myCharacter)
+    
+    local targetRoot = getHumanoidRootPart(targetCharacter)
+    if not targetRoot then return end
+    
+    local lookVector = targetRoot.CFrame.LookVector
+    local targetPosition = targetRoot.Position + (lookVector * 2.5) + Vector3.new(0, 0.5, 0)
+    
+    local backCFrame = CFrame.new(targetPosition) * CFrame.Angles(0, math.pi, 0)
+    myRoot.CFrame = backCFrame
 end
