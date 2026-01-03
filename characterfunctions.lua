@@ -1,4 +1,5 @@
-    -- Auto Farm
+-- Auto Farm
+local State = {
     AutoFarm = {
         Enabled = false,
         TargetPlayer = nil,
@@ -9,18 +10,11 @@
         MaxHealth = 115,
         IsRespawning = false
     },
+}
 
 local SAVECUBE_COORDINATES = Vector3.new(-4185.1, 102.6, 283.6)
 local UNDERGROUND_COORDINATES = Vector3.new(-5048.8, -258.8, -129.8)
 local SAVEVIBECHECK_COORDINATES = Vector3.new(-4878.1, -165.5, -921.2)
-
-local function updateCameraSettings()
-    if State.Camera.NoclipEnabled then
-        LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
-    else
-        LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Zoom
-    end
-end
 
 local function findTargetPlayer(playerName)
     for _, player in pairs(Players:GetPlayers()) do
@@ -218,3 +212,178 @@ local function teleportToSaveVibecheck()
     rootPart.CFrame = CFrame.new(SAVEVIBECHECK_COORDINATES)
     Library:Notify("Teleported to Save Vibecheck", 2)
 end
+
+local FarmLeft = Tabs.Farm:AddLeftGroupbox("Auto Farm")
+local FarmRight = Tabs.Farm:AddRightGroupbox("Auto Pick Money")
+
+local function toggleAutoFarm(state)
+    State.AutoFarm.Enabled = state
+    
+    if State.AutoFarm.Enabled then
+        local targetName = targetNameBox.Value
+        if targetName == "" then
+            Toggles.AutoFarm:SetValue(false)
+            Library:Notify("Enter target name first!", 3)
+            return
+        end
+        
+        State.AutoFarm.TargetPlayer = findTargetPlayer(targetName)
+        if not State.AutoFarm.TargetPlayer then
+            Toggles.AutoFarm:SetValue(false)
+            Library:Notify("Player not found!", 3)
+            return
+        end
+        
+        toggleFists()
+        
+        if not State.AutoFarmCharacterAddedConnection then
+            State.AutoFarmCharacterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(char)
+                task.wait(0.2)
+                if State.AutoFarm.Enabled then
+                    toggleFists()
+                    Library:Notify("Auto fists after death", 2)
+                end
+            end)
+        end
+        
+        startESpam()
+        startDamageDetection()
+        State.AutoFarm.TeleportConnection = RunService.Heartbeat:Connect(teleportToTarget)
+        Library:Notify("Auto Farm started!", 3)
+        
+    else
+        if State.AutoFarm.TeleportConnection then State.AutoFarm.TeleportConnection:Disconnect() end
+        if State.AutoFarm.ESpamConnection then State.AutoFarm.ESpamConnection:Disconnect() end
+        if State.AutoFarm.DamageCheckConnection then State.AutoFarm.DamageCheckConnection:Disconnect() end
+        
+        if State.AutoFarmCharacterAddedConnection then
+            State.AutoFarmCharacterAddedConnection:Disconnect()
+            State.AutoFarmCharacterAddedConnection = nil
+        end
+        
+        State.AutoFarm.TargetPlayer = nil
+        State.AutoFarm.RespawnCooldown = false
+        State.AutoFarm.IsRespawning = false
+        State.AutoFarm.MaxHealth = 115
+        Library:Notify("Auto Farm stopped!", 3)
+    end
+end
+
+-- Collector (Auto Pick Money)
+local Collector = {
+    Enabled = false,
+    Signal = nil,
+    Task = nil
+}
+
+local Settings = { IsDead = false }
+local CoolDowns = { AutoPickUps = { MoneyCooldown = false } }
+
+local function CollectorCoreLogic()
+    local RSS = RunService
+    local RSRep = ReplicatedStorage
+    local WS = Workspace
+    local function RunCollectorLogic()
+        if not Collector.Enabled or Settings.IsDead then return end
+        local breadContainer = WS.Filter:FindFirstChild("SpawnedBread")
+        local pickupRemote = RSRep.Events:FindFirstChild("CZDPZUS")
+        if not breadContainer then return end
+        if not pickupRemote then return end
+        local pchar = LocalPlayer.Character
+        local rootpart = pchar and pchar:FindFirstChild("HumanoidRootPart")
+        if not rootpart or CoolDowns.AutoPickUps.MoneyCooldown then return end
+        local currentpos = rootpart.Position
+        for _, item in ipairs(breadContainer:GetChildren()) do
+            local distsq = (currentpos - item.Position).Magnitude^2
+            if distsq < 25 and not CoolDowns.AutoPickUps.MoneyCooldown then
+                CoolDowns.AutoPickUps.MoneyCooldown = true
+                pcall(function()
+                    pickupRemote:FireServer(item)
+                end)
+                task.wait(1.1)
+                CoolDowns.AutoPickUps.MoneyCooldown = false
+                break
+            end
+        end
+    end
+    Collector.Signal = RSS.RenderStepped:Connect(RunCollectorLogic)
+end
+
+local function CollectorActivate()
+    if Collector.Enabled then return end
+    Collector.Enabled = true
+    if Collector.Signal then
+        Collector.Signal:Disconnect()
+        Collector.Signal = nil
+    end
+    if Collector.Task then
+        coroutine.close(Collector.Task)
+        Collector.Task = nil
+    end
+    Collector.Task = coroutine.create(CollectorCoreLogic)
+    coroutine.resume(Collector.Task)
+    Library:Notify("Auto Pick Money enabled!", 3)
+end
+
+local function CollectorDeactivate()
+    if not Collector.Enabled then return end
+    Collector.Enabled = false
+    if Collector.Signal then
+        Collector.Signal:Disconnect()
+        Collector.Signal = nil
+    end
+    if CoolDowns and CoolDowns.AutoPickUps then
+        CoolDowns.AutoPickUps.MoneyCooldown = false
+    end
+    Library:Notify("Auto Pick Money disabled!", 3)
+end
+
+-- UI часть для Auto Farm (из вкладки Farm)
+local FarmLeft = Tabs.Farm:AddLeftGroupbox("Auto Farm")
+local FarmRight = Tabs.Farm:AddRightGroupbox("Auto Pick Money")
+
+local targetNameBox = FarmLeft:AddInput("TargetName", {
+    Text = "Target Name",
+    Placeholder = "Enter username...",
+    Default = "",
+    Callback = function(value)
+    end
+})
+
+FarmLeft:AddToggle("AutoFarm", {
+    Text = "Auto Farm",
+    Default = false,
+    Callback = function(state)
+        toggleAutoFarm(state)
+    end
+})
+
+FarmLeft:AddDivider()
+FarmLeft:AddLabel("Teleports:")
+
+FarmLeft:AddButton({
+    Text = "SaveCube",
+    Func = teleportToSaveCube
+})
+
+FarmLeft:AddButton({
+    Text = "Underground",
+    Func = teleportToUnderground
+})
+
+FarmLeft:AddButton({
+    Text = "SaveVibecheck",
+    Func = teleportToSaveVibecheck
+})
+
+FarmRight:AddToggle("AutoPickMoney", {
+    Text = "Auto Pick Money",
+    Default = false,
+    Callback = function(value)
+        if value then
+            CollectorActivate()
+        else
+            CollectorDeactivate()
+        end
+    end
+})
