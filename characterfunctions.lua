@@ -1,16 +1,3 @@
-[file name]: image.png
-[file content begin]
-19:12:21 ~~ CoreGui.7808.Loadstring.loadstring:874312:297: attempt to index nil with ‘Farm
-Stack Begin
-
-@ = Script 'CoreGui.7808.Loadstring. loadstring: 874312’
-
-Script 'CoreGui.7808.3371885', Line 52
-
-Stack End
-
-
-[file content end]
 
 -- ============================================
 -- AUTO FARM SYSTEM (ПОЛНЫЙ МОДУЛЬ)
