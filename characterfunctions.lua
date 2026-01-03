@@ -1,3 +1,15 @@
+    -- Auto Farm
+    AutoFarm = {
+        Enabled = false,
+        TargetPlayer = nil,
+        TeleportConnection = nil,
+        ESpamConnection = nil,
+        DamageCheckConnection = nil,
+        RespawnCooldown = false,
+        MaxHealth = 115,
+        IsRespawning = false
+    },
+
 local SAVECUBE_COORDINATES = Vector3.new(-4185.1, 102.6, 283.6)
 local UNDERGROUND_COORDINATES = Vector3.new(-5048.8, -258.8, -129.8)
 local SAVEVIBECHECK_COORDINATES = Vector3.new(-4878.1, -165.5, -921.2)
